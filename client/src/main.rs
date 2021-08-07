@@ -8,8 +8,14 @@ mod proto;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = SnakeServerClient::connect("http://[::1]:50051").await?;
 
+
+
+    let stdin = io::stdin();
+    let mut lines = BufReader::new(stdin).lines();
+    println!("Enter Name");
+    let user = lines.next_line().await?.unwrap();
     let request = tonic::Request::new(Login {
-        user: "Tonic".into(),
+        user: user.clone(),
     });
 
     let mut response = client.receive_message(request).await?.into_inner();
@@ -18,16 +24,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}:\n{}", message.user, message.message)
         }
     });
-
-    let stdin = io::stdin();
-    let mut lines = BufReader::new(stdin).lines();
     loop {
         let line = lines.next_line().await?.unwrap();
         if line == "exit" {
             break;
         }
         let request = tonic::Request::new(ChatMessage {
-            user: "Tonic".into(),
+            user: user.clone(),
             message: line,
         });
         client.send_message(request).await?;
