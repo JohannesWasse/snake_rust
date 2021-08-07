@@ -1,0 +1,24 @@
+
+ syntax = "proto3";
+
+ package snake;
+
+ // EchoRequest is the request for echo.
+ message ChatMessage {
+   string user = 1;
+   string message = 2;
+ }
+
+ // EchoResponse is the response for echo.
+ message Login {
+   string user = 1;
+ }
+
+ message SendResult {}
+ // Echo is the echo service.
+ service SnakeServer {
+   // UnaryEcho is unary echo.
+   rpc ReceiveMessage(Login) returns (stream ChatMessage) {}
+   rpc SendMessage(ChatMessage) returns (SendResult) {}
+   // ServerStreamingEcho is server side streaming.
+ }
