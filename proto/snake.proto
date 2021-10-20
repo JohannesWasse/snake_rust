@@ -9,6 +9,25 @@
    string message = 2;
  }
 
+ message PlayerMove {
+   enum Direction {
+     Top = 0;
+     Left = 1;
+     Bottom = 2;
+     Right = 3;
+   }
+   Direction direction = 1;
+   string name = 2;
+ }
+
+ message Point {
+   int32 x = 1;
+   int32 y = 2;
+ }
+
+ message PlayerState {
+   repeated Point line_stripe = 1;
+ }
  // EchoResponse is the response for echo.
  message Login {
    string user = 1;
@@ -17,6 +36,8 @@
  message SendResult {}
  // Echo is the echo service.
  service SnakeServer {
+   rpc MakeMove(PlayerMove) returns (SendResult) {}
+   rpc ObserveGameState(Login) returns (stream PlayerState) {}
    // UnaryEcho is unary echo.
    rpc ReceiveMessage(Login) returns (stream ChatMessage) {}
    rpc SendMessage(ChatMessage) returns (SendResult) {}

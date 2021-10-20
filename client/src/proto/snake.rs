@@ -6,6 +6,36 @@ pub struct ChatMessage {
     #[prost(string, tag = "2")]
     pub message: ::prost::alloc::string::String,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PlayerMove {
+    #[prost(enumeration = "player_move::Direction", tag = "1")]
+    pub direction: i32,
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `PlayerMove`.
+pub mod player_move {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Direction {
+        Top = 0,
+        Left = 1,
+        Bottom = 2,
+        Right = 3,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Point {
+    #[prost(int32, tag = "1")]
+    pub x: i32,
+    #[prost(int32, tag = "2")]
+    pub y: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PlayerState {
+    #[prost(message, repeated, tag = "1")]
+    pub line_stripe: ::prost::alloc::vec::Vec<Point>,
+}
 /// EchoResponse is the response for echo.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Login {
@@ -74,6 +104,37 @@ pub mod snake_server_client {
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
+        }
+        pub async fn make_move(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PlayerMove>,
+        ) -> Result<tonic::Response<super::SendResult>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/snake.SnakeServer/MakeMove");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn observe_game_state(
+            &mut self,
+            request: impl tonic::IntoRequest<super::Login>,
+        ) -> Result<tonic::Response<tonic::codec::Streaming<super::PlayerState>>, tonic::Status>
+        {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/snake.SnakeServer/ObserveGameState");
+            self.inner
+                .server_streaming(request.into_request(), path, codec)
+                .await
         }
         #[doc = " UnaryEcho is unary echo."]
         pub async fn receive_message(
