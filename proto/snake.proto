@@ -11,9 +11,9 @@
 
  message PlayerMove {
    enum Direction {
-     Top = 0;
+     UP = 0;
      Left = 1;
-     Bottom = 2;
+     Down = 2;
      Right = 3;
    }
    Direction direction = 1;

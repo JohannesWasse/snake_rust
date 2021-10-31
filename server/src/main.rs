@@ -70,7 +70,8 @@ impl proto::snake::snake_server_server::SnakeServer for SnakeServer {
         &self,
         request: Request<PlayerMove>,
     ) -> Result<Response<SendResult>, Status> {
-        unimplemented!()
+        self.snake.make_move(request.get_ref()).await;
+        Ok(Response::new(SendResult {}))
     }
 
     type ObserveGameStateStream = ReceiverStream<Result<PlayerState, Status>>;

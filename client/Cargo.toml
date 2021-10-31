@@ -13,6 +13,7 @@ tui = "0.16"
 termion = "1.5"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 tokio-util = "0.6.7"
+futures = "0.3"
 
 [build-dependencies]
 tonic-build = "0.5"

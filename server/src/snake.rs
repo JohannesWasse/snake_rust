@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tonic::Status;
+use tokio::time::Duration;
 
 type SnakeClients = HashMap<String, Sender<Result<proto::PlayerState, Status>>>;
 
@@ -29,6 +30,7 @@ impl Snake {
         if line_stripe.len() == 1 {
             line_stripe.push(point.move_in_direction(direction));
         } else {
+            tracing::info!("Lines {:?}", line_stripe.len());
             let prev = &line_stripe[line_stripe.len() - 2];
             let can_update = direction == point.direction(prev);
             if can_update {
@@ -47,6 +49,8 @@ impl Snake {
     ) {
         let mut clients = self.clients.lock().await;
         clients.insert(name, sender);
+        let mut l = self.line_stripe.lock().await;
+        *l = vec![Point::new(10, 10), Point::new(15, 10)];
     }
 
     async fn line_stripe_proto(&self) -> Vec<proto::Point> {
@@ -62,7 +66,16 @@ impl Snake {
         clients.clone()
     }
 
-    async fn send_message(&self, new_move: &proto::PlayerMove) {}
+    pub async fn make_move(&self, new_move: &proto::PlayerMove) {
+        let mut d =  self.direction.lock().await;
+        *d = match new_move.direction {
+            0 => Direction::Up,
+            1 => Direction::Left,
+            2 => Direction::Down,
+            3 => Direction::Right,
+            _ => panic!("Invalid value for direction {}", new_move.direction)
+        }
+    }
     pub async fn update_clients(&self) {
         let clients = self.clients_clone().await;
         let mut to_be_removed = Vec::new();
@@ -70,6 +83,7 @@ impl Snake {
             line_stripe: self.line_stripe_proto().await,
         };
         for (name, client) in clients.iter() {
+            tracing::info!("Send state to client");
             let result = client.send(Ok(proto_message.clone())).await;
             if let Err(err) = result {
                 tracing::info!("Removing client {:?}", err.to_string());

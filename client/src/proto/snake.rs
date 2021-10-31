@@ -18,9 +18,9 @@ pub mod player_move {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Direction {
-        Top = 0,
+        Up = 0,
         Left = 1,
-        Bottom = 2,
+        Down = 2,
         Right = 3,
     }
 }
