@@ -4,6 +4,8 @@ mod snake;
 use crate::proto::snake::snake_server_server::SnakeServerServer;
 use crate::proto::snake::{ChatMessage, Login, PlayerMove, PlayerState, SendResult};
 use crate::snake::Snake;
+use core::sync::atomic::AtomicBool;
+use core::sync::atomic::Ordering;
 use prost::alloc::sync::Arc;
 use std::collections::HashMap;
 use structopt::StructOpt;
@@ -114,31 +116,21 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
-        .with_max_level(tracing_subscriber::filter::LevelFilter::DEBUG)
-        // completes the builder.
-        .finish();
+    let game_running = Arc::new(AtomicBool::new(true));
     let opt = Opt::from_args();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    let snake_server = SnakeServer::new();
+
+    init_tracing();
+    spawn_game_updater(game_running.clone(), snake_server.clone());
+    spawn_client_updater(game_running.clone(), snake_server.clone());
+    run_grpc_server(&opt, snake_server).await?;
+
+    Ok(())
+}
+
+async fn run_grpc_server(opt: &Opt, snake_server: SnakeServer) -> Result<(), Box<dyn std::error::Error>>  {
     info!("Starting server on port {}", opt.port);
     let addr = format!("[::1]:{}", opt.port).parse()?;
-    let snake_server = SnakeServer::new();
-    let snake_server1 = snake_server.clone();
-    let snake_server2 = snake_server.clone();
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(200));
-        while let _ = interval.tick().await {
-            snake_server1.snake.update().await;
-        }
-    });
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(200));
-        while let _ = interval.tick().await {
-            snake_server.snake.update_clients().await;
-        }
-    });
     Server::builder()
         .trace_fn(|request| {
             span!(
@@ -149,9 +141,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 request.uri().to_string()
             )
         })
-        .add_service(SnakeServerServer::new(snake_server2))
+        .add_service(SnakeServerServer::new(snake_server))
         .serve(addr)
         .await?;
 
     Ok(())
+}
+
+fn init_tracing() {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing_subscriber::filter::LevelFilter::DEBUG)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+}
+
+fn spawn_client_updater(game_running: Arc<AtomicBool>, snake_server: SnakeServer) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(200));
+        while game_running.load(Ordering::SeqCst) {
+            let _ = interval.tick().await;
+            snake_server.snake.update_clients().await;
+        }
+    });
+}
+
+fn spawn_game_updater(game_running: Arc<AtomicBool>, snake_server1: SnakeServer) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(200));
+        while game_running.load(Ordering::SeqCst) {
+            let _ = interval.tick().await;
+            snake_server1.snake.update().await;
+        }
+    });
 }

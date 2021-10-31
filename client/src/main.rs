@@ -2,11 +2,9 @@ mod events;
 mod proto;
 
 use crate::proto::snake::snake_server_client::SnakeServerClient;
-use crate::proto::snake::{ChatMessage, Login};
-use crate::proto::snake::player_move as player_move;
+use crate::proto::snake::Login;
 use tokio::io;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
-use futures::{future, Future, Stream};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Enter Name");
     let user = read_next_line().await?;
     let request = tonic::Request::new(Login { user: user.clone() });
-    let mut response = client.observe_game_state(request).await?.into_inner();
+    let response = client.observe_game_state(request).await?.into_inner();
     ui::init_board(client.clone(), user.clone(), response)?;
     Ok(())
 }
@@ -31,34 +29,39 @@ async fn read_next_line() -> Result<String, Box<dyn std::error::Error>> {
 
 mod ui {
     use crate::events::{Config, Event, Events};
-    use std::thread::sleep;
-    use std::{error::Error, io, time::Duration};
+    use crate::proto::snake::snake_server_client::SnakeServerClient;
+    use crate::proto::snake::{PlayerMove, PlayerState};
+    use prost::alloc::sync::Arc;
+    use std::sync::Mutex;
+    use std::{error::Error, time::Duration};
     use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
+    use tonic::transport::Channel;
+    use tonic::{Request, Streaming};
     use tui::widgets::canvas::Line;
     use tui::{
         backend::TermionBackend,
-        layout::{Constraint, Layout, Rect},
+        layout::{Constraint, Layout, },
         style::Color,
         widgets::{
-            canvas::{Canvas, Map, MapResolution, Rectangle},
+            canvas::Canvas,
             Block, Borders,
         },
         Terminal,
     };
-    use crate::proto::snake::snake_server_client::SnakeServerClient;
-    use tonic::transport::Channel;
-    use crate::proto::snake::{PlayerMove, PlayerState};
-    use tonic::{Request, Streaming};
-    use std::sync::Mutex;
-    use prost::alloc::sync::Arc;
 
-    pub fn init_board(mut client: SnakeServerClient<Channel>, user: String, mut response: Streaming<PlayerState>) -> Result<(), Box<dyn Error>> {
+    pub fn init_board(
+        mut client: SnakeServerClient<Channel>,
+        user: String,
+        mut response: Streaming<PlayerState>,
+    ) -> Result<(), Box<dyn Error>> {
         let stdout = std::io::stdout().into_raw_mode()?;
         let stdout = MouseTerminal::from(stdout);
         let stdout = AlternateScreen::from(stdout);
         let backend = TermionBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let state = Arc::new(Mutex::new(PlayerState{ line_stripe: vec![] }));
+        let state = Arc::new(Mutex::new(PlayerState {
+            line_stripe: vec![],
+        }));
         let state2 = state.clone();
         tokio::spawn(async move {
             while let Ok(Some(message)) = response.message().await {
@@ -101,7 +104,6 @@ mod ui {
                     })
                     .x_bounds([10.0, 110.0])
                     .y_bounds([10.0, 110.0]);
-                let area = Rect::new(0, 0, 500, 500);
                 f.render_widget(canvas, chunks[0]);
             })?;
 
@@ -111,40 +113,37 @@ mod ui {
                         break;
                     }
                     Key::Down => {
-                        let r = Request::new(PlayerMove{
+                        let r = Request::new(PlayerMove {
                             direction: 2,
-                            name: "".to_string()
+                            name: user.clone(),
                         });
                         futures::executor::block_on(client.make_move(r))?;
                     }
                     Key::Up => {
-                        let r = Request::new(PlayerMove{
+                        let r = Request::new(PlayerMove {
                             direction: 0,
-                            name: "".to_string()
+                            name: user.clone(),
                         });
                         futures::executor::block_on(client.make_move(r))?;
                     }
                     Key::Right => {
-                        let r = Request::new(PlayerMove{
+                        let r = Request::new(PlayerMove {
                             direction: 3,
-                            name: "".to_string()
+                            name: user.clone(),
                         });
                         futures::executor::block_on(client.make_move(r))?;
                     }
                     Key::Left => {
-                        let r = Request::new(PlayerMove{
+                        let r = Request::new(PlayerMove {
                             direction: 1,
-                            name: "".to_string()
+                            name: user.clone(),
                         });
                         futures::executor::block_on(client.make_move(r))?;
                     }
 
                     _ => {}
                 },
-                Event::Tick => {
-
-                }
-                _ => {}
+                Event::Tick => {}
             }
         }
         Ok(())

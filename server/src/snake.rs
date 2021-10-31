@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tonic::Status;
-use tokio::time::Duration;
 
 type SnakeClients = HashMap<String, Sender<Result<proto::PlayerState, Status>>>;
 
@@ -24,8 +23,8 @@ impl Snake {
     }
 
     pub async fn update(&self) {
-        let mut line_stripe = &mut *self.line_stripe.lock().await;
-        let point = line_stripe.last().expect("Never Zero length");
+        let line_stripe = &mut *self.line_stripe.lock().await;
+        let point = *line_stripe.last().expect("Never Zero length");
         let direction = *self.direction.lock().await;
         if line_stripe.len() == 1 {
             line_stripe.push(point.move_in_direction(direction));
@@ -54,7 +53,7 @@ impl Snake {
     }
 
     async fn line_stripe_proto(&self) -> Vec<proto::Point> {
-        let mut line_stripe = &mut *self.line_stripe.lock().await;
+        let line_stripe = &mut *self.line_stripe.lock().await;
         line_stripe
             .iter()
             .map(|p| proto::Point { x: p.x, y: p.y })
@@ -67,14 +66,14 @@ impl Snake {
     }
 
     pub async fn make_move(&self, new_move: &proto::PlayerMove) {
-        let mut d =  self.direction.lock().await;
+        let mut d = self.direction.lock().await;
         *d = match new_move.direction {
             0 => Direction::Up,
             1 => Direction::Left,
             2 => Direction::Down,
             3 => Direction::Right,
-            _ => panic!("Invalid value for direction {}", new_move.direction)
-        }
+            _ => panic!("Invalid value for direction {}", new_move.direction),
+        };
     }
     pub async fn update_clients(&self) {
         let clients = self.clients_clone().await;
@@ -107,7 +106,7 @@ enum Direction {
     Up,
     Down,
 }
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct Point {
     x: i32,
     y: i32,
