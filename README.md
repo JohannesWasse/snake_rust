@@ -1,3 +1,6 @@
+[![Rust](https://github.com/JohannesWasse/snake_rust/actions/workflows/rust.yml/badge.svg)](https://github.com/JohannesWasse/snake_rust/actions/workflows/rust.yml)
+
+
 # A snake implementation to explore rust
 # welcome changes
 - implement an actual game logic
@@ -9,4 +12,3 @@
 - implement compter enemy 
 - ...
 
-[![Rust](https://github.com/JohannesWasse/snake_rust/actions/workflows/rust.yml/badge.svg)](https://github.com/JohannesWasse/snake_rust/actions/workflows/rust.yml)
