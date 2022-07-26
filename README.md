@@ -3,6 +3,7 @@
 
 # A snake implementation to explore rust
 # welcome changes
+- Tests 😉
 - implement an actual game logic
 - Cleanup chat Stuff
 - implement Server Client Peeling
