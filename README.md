@@ -6,7 +6,7 @@
 - Tests 😉
 - implement an actual game logic
 - Cleanup chat Stuff
-- implement Server Client Peeling
+- implement Server Client Peering 
 - implement multiplayer
 - implement multiplayer ui
 - implement multiplayer chat
