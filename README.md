@@ -2,6 +2,9 @@
 
 
 # A snake implementation to explore rust
+# tech Stack 
+- grpc tonic 
+- ...
 # welcome changes
 - Tests 😉
 - implement an actual game logic
