@@ -10,6 +10,6 @@
 - implement multiplayer
 - implement multiplayer ui
 - implement multiplayer chat
-- implement compter enemy 
+- implement computer enemy 🤯
 - ...
 
