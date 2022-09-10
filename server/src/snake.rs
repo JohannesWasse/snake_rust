@@ -9,7 +9,7 @@ type SnakeClients = HashMap<String, Sender<Result<proto::PlayerState, Status>>>;
 #[derive(Debug)]
 pub(crate) struct Snake {
     clients: Mutex<SnakeClients>,
-    line_stripe: Mutex<Vec<Point>>,
+    line_stripe: Mutex<LineStripe>,
     direction: Mutex<Direction>,
 }
 
@@ -17,28 +17,15 @@ impl Snake {
     pub fn new() -> Snake {
         Self {
             clients: Default::default(),
-            line_stripe: Mutex::new(vec![Point::new(10, 10), Point::new(15, 10)]),
+            line_stripe: Mutex::new(LineStripe::new()),
             direction: Mutex::new(Direction::Right),
         }
     }
 
     pub async fn update(&self) {
         let line_stripe = &mut *self.line_stripe.lock().await;
-        let point = *line_stripe.last().expect("Never Zero length");
-        let direction = *self.direction.lock().await;
-        if line_stripe.len() == 1 {
-            line_stripe.push(point.move_in_direction(direction));
-        } else {
-            tracing::info!("Lines {:?}", line_stripe.len());
-            let prev = &line_stripe[line_stripe.len() - 2];
-            let can_update = direction == point.direction(prev);
-            if can_update {
-                let len = line_stripe.len();
-                line_stripe[len - 1] = point.move_in_direction(direction);
-            } else {
-                line_stripe.push(point.move_in_direction(direction));
-            }
-        }
+        let d = self.direction.lock().await;
+        line_stripe.move_in_direction(*d);
     }
 
     pub(crate) async fn add_client(
@@ -49,15 +36,12 @@ impl Snake {
         let mut clients = self.clients.lock().await;
         clients.insert(name, sender);
         let mut l = self.line_stripe.lock().await;
-        *l = vec![Point::new(10, 10), Point::new(15, 10)];
+        *l = LineStripe::new();
     }
 
     async fn line_stripe_proto(&self) -> Vec<proto::Point> {
-        let line_stripe = &mut *self.line_stripe.lock().await;
-        line_stripe
-            .iter()
-            .map(|p| proto::Point { x: p.x, y: p.y })
-            .collect()
+        let line_stripe = self.line_stripe.lock().await;
+        line_stripe.line_stripe_proto()
     }
 
     async fn clients_clone(&self) -> SnakeClients {
@@ -75,6 +59,7 @@ impl Snake {
             _ => panic!("Invalid value for direction {}", new_move.direction),
         };
     }
+
     pub async fn update_clients(&self) {
         let clients = self.clients_clone().await;
         let mut to_be_removed = Vec::new();
@@ -82,7 +67,7 @@ impl Snake {
             line_stripe: self.line_stripe_proto().await,
         };
         for (name, client) in clients.iter() {
-            tracing::info!("Send state to client");
+            tracing::debug!("Send state to client");
             let result = client.send(Ok(proto_message.clone())).await;
             if let Err(err) = result {
                 tracing::info!("Removing client {:?}", err.to_string());
@@ -106,7 +91,47 @@ enum Direction {
     Up,
     Down,
 }
-#[derive(Debug, Copy, Clone)]
+
+/// Invariant:
+/// length of points must be greater 2
+/// lines are always vertical or horizontal
+/// p[i].x - p[i-1].x == 0 || p[i].y - p[i-1].y == 0
+#[derive(Debug)]
+struct LineStripe {
+    points: Vec<Point>,
+}
+
+impl LineStripe {
+    fn new() -> LineStripe {
+        Self::from(Point::new(10, 10), Point::new(15, 10))
+    }
+
+    fn from(start: Point, end: Point) -> Self {
+        LineStripe {
+            points: vec![start, end],
+        }
+    }
+
+    fn line_stripe_proto(&self) -> Vec<proto::Point> {
+        self.points
+            .iter()
+            .map(|p| proto::Point { x: p.x, y: p.y })
+            .collect()
+    }
+
+    fn move_in_direction(&mut self, direction: Direction) {
+        let len = self.points.len();
+        let prev = self.points[len - 2];
+        let current = self.points[len - 1];
+        if direction == current.direction(&prev) {
+            self.points[len - 1] = current.move_in_direction(direction);
+        } else {
+            self.points.push(current.move_in_direction(direction));
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct Point {
     x: i32,
     y: i32,
@@ -156,5 +181,22 @@ impl Point {
             x: self.x,
             y: self.y + dy,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::snake::{Direction, LineStripe, Point};
+
+    #[test]
+    fn it_works() {
+        let mut line_stripe = LineStripe::from(Point::new(10, 10), Point::new(10, 15));
+        line_stripe.move_in_direction(Direction::Up);
+        assert_eq!(Point::new(10, 10), line_stripe.points[0]);
+        assert_eq!(Point::new(10, 16), line_stripe.points[1]);
+        line_stripe.move_in_direction(Direction::Right);
+        assert_eq!(Point::new(10, 10), line_stripe.points[0]);
+        assert_eq!(Point::new(10, 16), line_stripe.points[1]);
+        assert_eq!(Point::new(11, 16), line_stripe.points[2]);
     }
 }

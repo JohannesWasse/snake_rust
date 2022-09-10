@@ -128,7 +128,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn run_grpc_server(opt: &Opt, snake_server: SnakeServer) -> Result<(), Box<dyn std::error::Error>>  {
+async fn run_grpc_server(
+    opt: &Opt,
+    snake_server: SnakeServer,
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting server on port {}", opt.port);
     let addr = format!("[::1]:{}", opt.port).parse()?;
     Server::builder()
